@@ -1,0 +1,17 @@
+{
+    "name": "p2p-octopus",
+    "version": "1.0.0",
+    "description": "Chat P2P para libertad de expresión y privacidad.",
+    "main": "app.js",
+    "scripts": {
+      "start": "node app.js"
+    },
+    "dependencies": {
+      "express": "^4.18.2",
+      "socket.io": "^4.5.4"
+    },
+    "devDependencies": {},
+    "author": "Tu nombre",
+    "license": "MIT"
+  }
+  

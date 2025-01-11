@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P2P Octopus</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #fff;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        body.dark-theme {
+            background-color: #121212;
+            color: #e0e0e0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        #messagesContainer {
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        body.dark-theme #messagesContainer {
+            background-color: #333;
+        }
+        .message {
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 10px;
+            background-color: #1f1f1f;
+            color: #e6e6e6;
+        }
+        .message span {
+            font-size: 0.8rem;
+            color: #ccc;
+        }
+        body.dark-theme .message span {
+            color: #aaa;
+        }
+        #messageInput {
+            flex-grow: 1;
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            background-color: #fff;
+        }
+        body.dark-theme #messageInput {
+            background-color: #333;
+            color: #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+    
+    <div class="container" style="text-align: center;">
+        <center>
+            <img id="logo" src="logo.jpg" alt="Logo" style="width: 120px;">
+        </center>
+    </div>
+
+    <div id="usernamePrompt" class="container text-center">
+        <h2>Bienvenido a P2P Octopus</h2>
+        <p>Por favor, ingresa tu nombre de usuario:</p>
+        <input type="text" id="usernameInput" class="form-control" placeholder="Nombre de usuario">
+        <button id="saveUsernameButton" class="btn btn-primary mt-3">Guardar y Continuar</button>
+    </div>
+
+    <div id="chatContainer" class="container d-none">
+        <p id="connectionStatus" class="text-center">Estado de la conexión: Esperando la conexión...</p>
+        <div id="messagesContainer"></div>
+        <form id="sendMessageForm" class="d-flex" onsubmit="return false;">
+            <input type="text" id="messageInput" class="form-control" placeholder="Escribe tu mensaje...">
+            <button type="button" id="sendButton" class="btn btn-primary ms-2">Enviar</button>
+        </form>
+        <button id="themeButton" class="btn btn-secondary mt-3 w-100">Cambiar Tema</button>
+        <button id="logoutButton" class="btn btn-danger mt-3 w-100">Cerrar Sesión</button>
+    </div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io.connect();
+
+        const usernamePrompt = document.getElementById('usernamePrompt');
+        const usernameInput = document.getElementById('usernameInput');
+        const saveUsernameButton = document.getElementById('saveUsernameButton');
+
+        const chatContainer = document.getElementById('chatContainer');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const messagesContainer = document.getElementById('messagesContainer');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const themeButton = document.getElementById('themeButton');
+        const logoutButton = document.getElementById('logoutButton');
+
+        let username = localStorage.getItem('username') || '';
+
+        if (username) {
+            usernamePrompt.classList.add('d-none');
+            chatContainer.classList.remove('d-none');
+            loadMessages();
+        }
+
+        saveUsernameButton.addEventListener('click', () => {
+            username = usernameInput.value.trim();
+            if (username) {
+                localStorage.setItem('username', username);
+                usernamePrompt.classList.add('d-none');
+                chatContainer.classList.remove('d-none');
+            }
+        });
+
+        function loadMessages() {
+            const savedMessages = JSON.parse(localStorage.getItem('messages') || '[]');
+            savedMessages.forEach(({ sender, message }) => {
+                appendMessage(sender, message);
+            });
+        }
+
+        function appendMessage(sender, message) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message');
+            messageElement.innerHTML = `<span>${sender}:</span> ${message}`;
+            messagesContainer.appendChild(messageElement);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        socket.on('message', ({ sender, message }) => {
+            if (sender !== username) { 
+                appendMessage(sender, message);
+                saveMessage(sender, message);
+            }
+        });
+
+        function saveMessage(sender, message) {
+            const savedMessages = JSON.parse(localStorage.getItem('messages') || '[]');
+            savedMessages.push({ sender, message });
+            localStorage.setItem('messages', JSON.stringify(savedMessages));
+        }
+
+        sendButton.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                sendMessage();
+            }
+        });
+
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (message) {
+                socket.emit('message', { sender: username, message });
+                appendMessage(username, message);
+                saveMessage(username, message);
+                messageInput.value = '';
+            }
+        }
+
+        themeButton.addEventListener('click', () => {
+            document.body.classList.toggle('dark-theme');
+            localStorage.setItem('theme', document.body.classList.contains('dark-theme') ? 'dark' : 'light');
+        });
+
+        logoutButton.addEventListener('click', () => {
+            localStorage.clear(); // Elimina todos los datos guardados
+            location.reload(); // Recarga la página
+        });
+
+        window.addEventListener('load', () => {
+            if (localStorage.getItem('theme') === 'dark') {
+                document.body.classList.add('dark-theme');
+            }
+        });
+
+        socket.on('connect', () => connectionStatus.textContent = `Hola ${username}, estás conectado al servidor`);
+        socket.on('disconnect', () => connectionStatus.textContent = "Estado de la conexión: Desconectado");
+    </script>
+</body>
+</html>
